@@ -15,14 +15,14 @@ function ensureAudio() {
 }
 
 // 1. EXPOSIÇÃO IMEDIATA DAS FUNÇÕES NO WINDOW (Garante funcionamento 100% dos cliques em qualquer navegador)
-window.sendPrompt = function (promptText) {
+window._sendPromptImpl = window.sendPrompt = function (promptText) {
   ensureAudio();
   if (promptText) {
     sendMessage(promptText);
   }
 };
 
-window.handleChatSubmit = function (e) {
+window._handleChatSubmitImpl = window.handleChatSubmit = function (e) {
   if (e) e.preventDefault();
   ensureAudio();
   const input = document.getElementById('chat-input');
@@ -32,7 +32,7 @@ window.handleChatSubmit = function (e) {
   if (input) input.value = '';
 };
 
-window.toggleVoice = function () {
+window._toggleVoiceImpl = window.toggleVoice = function () {
   ensureAudio();
   isVoiceEnabled = !isVoiceEnabled;
   const btn = document.getElementById('voice-toggle-btn');
@@ -49,7 +49,7 @@ window.toggleVoice = function () {
   }
 };
 
-window.toggleMemory = function (open) {
+window._toggleMemoryImpl = window.toggleMemory = function (open) {
   const backdrop = document.getElementById('drawer-backdrop');
   const panel = document.getElementById('drawer-panel');
 
@@ -65,7 +65,7 @@ window.toggleMemory = function (open) {
   }
 };
 
-window.toggleSettings = function (open) {
+window._toggleSettingsImpl = window.toggleSettings = function (open) {
   const modal = document.getElementById('api-key-modal');
   if (modal) {
     modal.classList.toggle('open', !!open);
@@ -73,7 +73,7 @@ window.toggleSettings = function (open) {
   }
 };
 
-window.toggleImmersion = function () {
+window._toggleImmersionImpl = window.toggleImmersion = function () {
   const container = document.getElementById('messages-container');
   const btn = document.getElementById('immersion-btn');
   if (container) {
@@ -84,7 +84,7 @@ window.toggleImmersion = function () {
   }
 };
 
-window.toggleMic = function () {
+window._toggleMicImpl = window.toggleMic = function () {
   ensureAudio();
   if (!voice) return;
 
@@ -106,7 +106,7 @@ window.toggleMic = function () {
   }
 };
 
-window.saveGeminiKey = function () {
+window._saveGeminiKeyImpl = window.saveGeminiKey = function () {
   const input = document.getElementById('api-key-input');
   const key = input ? input.value.trim() : '';
   if (!key) return;
@@ -128,7 +128,7 @@ window.saveGeminiKey = function () {
   }
 };
 
-window.addGoalFromInput = function () {
+window._addGoalFromInputImpl = window.addGoalFromInput = function () {
   const input = document.getElementById('new-goal-input');
   const val = input ? input.value.trim() : '';
   if (!val) return;
@@ -192,6 +192,13 @@ function initApp() {
   window.addEventListener('keydown', ensureAudio, { capture: true, once: true });
   window.addEventListener('touchstart', ensureAudio, { capture: true, once: true });
 
+  // Processar prompts pendentes se o usuário clicou antes do término do carregamento
+  if (window._pendingPrompts && window._pendingPrompts.length > 0) {
+    const queue = [...window._pendingPrompts];
+    window._pendingPrompts = [];
+    queue.forEach((p) => window.sendPrompt(p));
+  }
+
   // Verificar status da chave
   checkServerStatus();
 }
@@ -205,6 +212,7 @@ if (document.readyState === 'loading') {
 
 async function checkServerStatus() {
   const settingsBtn = document.getElementById('settings-btn');
+  const apiKeyInput = document.getElementById('api-key-input');
   let isReady = false;
 
   try {
@@ -215,6 +223,11 @@ async function checkServerStatus() {
     }
   } catch {
     isReady = !!localStorage.getItem('gemini_api_key');
+  }
+
+  const storedKey = localStorage.getItem('gemini_api_key');
+  if (apiKeyInput && storedKey && !apiKeyInput.value) {
+    apiKeyInput.value = storedKey;
   }
 
   if (settingsBtn) {

@@ -7,7 +7,62 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./css/style.css?v=6.0">
+  <link rel="stylesheet" href="./css/style.css?v=7.0">
+  <script>
+    // Handlers imediatos à prova de falhas: ativos desde o milissegundo zero
+    window._pendingPrompts = [];
+    window.sendPrompt = function (text) {
+      if (window._sendPromptImpl) {
+        window._sendPromptImpl(text);
+      } else {
+        window._pendingPrompts.push(text);
+      }
+    };
+    window.handleChatSubmit = function (e) {
+      if (e) e.preventDefault();
+      if (window._handleChatSubmitImpl) {
+        window._handleChatSubmitImpl(e);
+      }
+    };
+    window.toggleVoice = function () {
+      if (window._toggleVoiceImpl) window._toggleVoiceImpl();
+    };
+    window.toggleMemory = function (open) {
+      if (window._toggleMemoryImpl) {
+        window._toggleMemoryImpl(open);
+      } else {
+        const b = document.getElementById('drawer-backdrop');
+        const p = document.getElementById('drawer-panel');
+        if (b) b.style.setProperty('display', open ? 'block' : 'none', 'important');
+        if (p) p.classList.toggle('open', !!open);
+      }
+    };
+    window.toggleSettings = function (open) {
+      if (window._toggleSettingsImpl) {
+        window._toggleSettingsImpl(open);
+      } else {
+        const m = document.getElementById('api-key-modal');
+        if (m) m.style.setProperty('display', open ? 'flex' : 'none', 'important');
+      }
+    };
+    window.toggleImmersion = function () {
+      if (window._toggleImmersionImpl) {
+        window._toggleImmersionImpl();
+      } else {
+        const c = document.getElementById('messages-container');
+        if (c) c.classList.toggle('minimized');
+      }
+    };
+    window.toggleMic = function () {
+      if (window._toggleMicImpl) window._toggleMicImpl();
+    };
+    window.saveGeminiKey = function () {
+      if (window._saveGeminiKeyImpl) window._saveGeminiKeyImpl();
+    };
+    window.addGoalFromInput = function () {
+      if (window._addGoalFromInputImpl) window._addGoalFromInputImpl();
+    };
+  </script>
 </head>
 <body>
 
@@ -157,6 +212,6 @@
     </div>
   </div>
 
-  <script type="module" src="./js/app.js?v=6.0"></script>
+  <script type="module" src="./js/app.js?v=7.0"></script>
 </body>
 </html>
