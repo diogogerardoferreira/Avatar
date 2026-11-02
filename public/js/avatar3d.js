@@ -121,7 +121,7 @@ export class RicardoAvatar3D {
   createRicardoSculpt() {
     const textureLoader = new THREE.TextureLoader();
     textureLoader.load(
-      '/ricardo.jpg',
+      './ricardo.jpg',
       (texture) => {
         texture.generateMipmaps = true;
         texture.minFilter = THREE.LinearMipmapLinearFilter;

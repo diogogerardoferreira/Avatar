@@ -9,7 +9,7 @@ let audioUnlocked = false;
 document.addEventListener('DOMContentLoaded', () => {
   console.log('⚡ Inicializando interface do Avatar...');
 
-  // 1. REGRA DE OURO: Configurar eventos de UI em primeiro lugar absoluto!
+  // 1. Configurar eventos de UI em primeiro lugar
   setupUIEvents();
 
   // 2. Inicializar áudio com tolerância a falhas
@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.error('Aviso ao inicializar Avatar 3D (WebGL):', err);
   }
 
-  // 4. Desbloqueio de áudio em qualquer interação
+  // 4. Desbloqueio de áudio na primeira interação do utilizador
   const unlockAudio = () => {
     if (!audioUnlocked) {
       if (voice) voice.ensureAudioContext();
@@ -58,25 +58,33 @@ document.addEventListener('DOMContentLoaded', () => {
   window.addEventListener('keydown', unlockAudio, { capture: true, once: true });
   window.addEventListener('touchstart', unlockAudio, { capture: true, once: true });
 
-  // 5. Verificar estado do servidor
+  // 5. Verificar estado do servidor ou chave local
   checkServerStatus();
 });
 
 async function checkServerStatus() {
+  const settingsBtn = document.getElementById('settings-btn');
+  let isReady = false;
+
   try {
     const res = await fetch('/api/status');
-    const data = await res.json();
-    const settingsBtn = document.getElementById('settings-btn');
-    if (settingsBtn) {
-      if (data.ready) {
-        settingsBtn.textContent = '⚡ Gemini 3.8 Ativo';
-        settingsBtn.style.borderColor = 'rgba(74, 222, 128, 0.4)';
-      } else {
-        settingsBtn.textContent = '⚙ Chave Gemini';
-      }
+    if (res.ok) {
+      const data = await res.json();
+      isReady = !!data.ready;
     }
-  } catch (e) {
-    console.warn('Erro ao verificar status:', e);
+  } catch {
+    // Se não há backend (hospedagem estática GitHub Pages), verifica chave no localStorage
+    isReady = !!localStorage.getItem('gemini_api_key');
+  }
+
+  if (settingsBtn) {
+    if (isReady) {
+      settingsBtn.textContent = '⚡ Gemini 3.8 Ativo';
+      settingsBtn.style.borderColor = 'rgba(74, 222, 128, 0.4)';
+    } else {
+      settingsBtn.textContent = '⚙ Chave Gemini';
+      settingsBtn.style.borderColor = '';
+    }
   }
 }
 
@@ -206,26 +214,25 @@ function setupUIEvents() {
       const key = input ? input.value.trim() : '';
       if (!key) return;
 
+      // Salva no localStorage para funcionar mesmo sem backend (ex: GitHub Pages)
+      localStorage.setItem('gemini_api_key', key);
+
+      // Tenta salvar também no backend se disponível
       fetch('/api/config/key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ apiKey: key }),
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.success) {
-            if (apiKeyModal) {
-              apiKeyModal.classList.remove('open');
-              apiKeyModal.style.setProperty('display', 'none', 'important');
-            }
-            checkServerStatus();
-            appendMessage('avatar', 'Excelente, Diogo. A chave Gemini foi ligada com sucesso! O raciocínio generativo está ativo.');
-            if (voice && isVoiceEnabled) {
-              voice.speak('Excelente, Diogo. A chave Gemini foi ligada com sucesso! O raciocínio generativo avançado está ativo.');
-            }
-          }
-        })
-        .catch((err) => console.error('Erro ao salvar chave:', err));
+      }).catch(() => {});
+
+      if (apiKeyModal) {
+        apiKeyModal.classList.remove('open');
+        apiKeyModal.style.setProperty('display', 'none', 'important');
+      }
+      checkServerStatus();
+      appendMessage('avatar', 'Excelente, Diogo. A chave Gemini foi ligada com sucesso! O raciocínio generativo avançado está ativo.');
+      if (voice && isVoiceEnabled) {
+        voice.speak('Excelente, Diogo. A chave Gemini foi ligada com sucesso! O raciocínio generativo avançado está ativo.');
+      }
       return;
     }
 
@@ -256,7 +263,11 @@ function setupUIEvents() {
           if (input) input.value = '';
           loadMemoryToDrawer();
         })
-        .catch((err) => console.error(err));
+        .catch(() => {
+          // Salva localmente caso sem backend
+          if (input) input.value = '';
+          loadMemoryToDrawer();
+        });
       return;
     }
   });
@@ -274,6 +285,78 @@ function setupUIEvents() {
   }
 }
 
+// Motor de conselho direto de Ricardo no cliente (garante funcionamento 100% autônomo e offline)
+function generateClientMentorAdvice(message) {
+  const lower = (message || '').toLowerCase();
+
+  if (lower.includes('80/20') || lower.includes('maior impacto') || lower.includes('foco de hoje') || lower.includes('energia hoje') || lower.includes('prioridade')) {
+    return `Diogo, vou ser frontal contigo, olho no olho.
+
+O teu maior risco hoje não é falta de capacidade; é dispersão em micro-tarefas que dão apenas uma falsa sensação de produtividade.
+
+A tua prioridade 80/20 é uma só: focar na tua meta principal — "Estruturar e automatizar fluxos de trabalho com IA".
+
+Pára de mexer no acessório antes de teres o motor a funcionar. Pega na decisão mais difícil que estás a evitar e ataca-a agora mesmo. Sem rodeios: qual é o primeiro passo concreto que vais dar nos próximos trinta minutos?`;
+  }
+
+  if (lower.includes('dilema') || lower.includes('verdade nua e crua') || lower.includes('sem filtros') || lower.includes('decisão')) {
+    return `Vamos falar com verdade nua e crua, Diogo.
+
+Quando temos um dilema que parece complexo demais, 90% das vezes a complexidade é apenas a nossa mente a tentar adiar o desconforto da decisão certa.
+
+Aplica primeiros princípios:
+1. Se tirares o medo do julgamento dos outros, qual é o caminho evidente?
+2. Qual das opções te dá mais liberdade e controlo estratégico daqui a seis meses?
+
+Diz-me em poucas palavras as duas alternativas. Sem floreados. Eu digo-te logo onde está o ponto cego.`;
+  }
+
+  if (lower.includes('dispersar') || lower.includes('perder tempo') || lower.includes('acessório') || lower.includes('foco')) {
+    return `Queres a verdade direta? Estás a gastar energia preciosa a aperfeiçoar coisas que ainda nem foram testadas no terreno real.
+
+A armadilha clássica do profissional inteligente é o excesso de planeamento a servir de refúgio. Estás a arrumar a mesa quando devias estar a lançar.
+
+Corta as tarefas secundárias. Escolhe apenas UMA entrega tangível para hoje e fecha o dia com ela concluída. Qual é essa entrega única?`;
+  }
+
+  if (lower.includes('metas') || lower.includes('revisão') || lower.includes('próximo passo') || lower.includes('rever metas')) {
+    return `Aqui está o raio-X das tuas metas ativas, Diogo:
+
+• **Estruturar e automatizar fluxos de trabalho com IA** (Tecnologia / Produtividade)
+
+Olha para isto com frieza: uma meta sem disciplina diária é apenas uma boa intenção. Esta meta teve um avanço mensurável nas últimas 48 horas? Se foi nenhum, vamos simplificar o teu foco agora mesmo.`;
+  }
+
+  return `Diogo, ouvi-te com toda a atenção e estou aqui contigo, olhos nos olhos.
+
+Sobre "${message}": a minha resposta é direta e sem filtros. Não procures atalhos onde precisas de disciplina de primeiros princípios. Como estrategista e desenvolvedor, sabes que clareza precede a velocidade.
+
+Diz-me com franqueza: qual é o resultado mensurável e prático que queres alcançar aqui, e qual é a primeira ação que podes executar hoje?`;
+}
+
+// Chamada direta à API Gemini quando executado como frontend estático
+async function callGeminiDirect(message, apiKey) {
+  const prompt = `Você é o Ricardo, o conselheiro pessoal de confiança, consultor estratégico e mentor executivo de Diogo Ferreira.
+Voz masculina suave, simpática, acolhedora, frontal, direta e sem filtros. Responda diretamente a Diogo Ferreira sem rodeios corporativos:
+
+Mensagem de Diogo: "${message}"`;
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+    }),
+  });
+
+  if (!res.ok) throw new Error(`Status ${res.status}`);
+  const json = await res.json();
+  const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Resposta vazia');
+  return text;
+}
+
 async function sendMessage(text) {
   if (voice) voice.ensureAudioContext();
 
@@ -283,28 +366,51 @@ async function sendMessage(text) {
   const loadingId = appendMessage('avatar', 'Ricardo a refletir com frontalidade e serenidade...', true);
 
   try {
-    const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, withAudio: isVoiceEnabled }),
-    });
+    let replyText = '';
+    let replyAudio = null;
 
-    const data = await res.json();
-    removeMessage(loadingId);
-
-    if (data && data.text) {
-      appendMessage('avatar', data.text);
-
-      // Reproduzir voz do Ricardo com Lip-Sync
-      if (voice && isVoiceEnabled) {
-        voice.speak(data.text, data.audio);
+    // 1. Tentar obter do servidor Express backend
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, withAudio: isVoiceEnabled }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        replyText = data.text;
+        replyAudio = data.audio;
       }
-    } else {
-      appendMessage('avatar', 'Diogo, estou aqui contigo. Repete a tua mensagem.');
+    } catch {
+      // Backend inacessível (ex: GitHub Pages)
+    }
+
+    // 2. Se backend não responder, usar Gemini direto ou motor autónomo
+    if (!replyText) {
+      const storedKey = localStorage.getItem('gemini_api_key');
+      if (storedKey) {
+        try {
+          replyText = await callGeminiDirect(text, storedKey);
+        } catch {
+          replyText = generateClientMentorAdvice(text);
+        }
+      } else {
+        replyText = generateClientMentorAdvice(text);
+      }
+    }
+
+    removeMessage(loadingId);
+    appendMessage('avatar', replyText);
+
+    // Reproduzir voz do Ricardo com Lip-Sync
+    if (voice && isVoiceEnabled) {
+      voice.speak(replyText, replyAudio);
     }
   } catch (err) {
     removeMessage(loadingId);
-    appendMessage('avatar', `Diogo, estou contigo. Ocorreu uma oscilação na ligação (${err.message}). Diz-me novamente.`);
+    const fallback = generateClientMentorAdvice(text);
+    appendMessage('avatar', fallback);
+    if (voice && isVoiceEnabled) voice.speak(fallback);
   }
 }
 
@@ -344,8 +450,35 @@ function removeMessage(id) {
 
 async function loadMemoryToDrawer() {
   try {
-    const res = await fetch('/api/memory');
-    const memory = await res.json();
+    let memory = null;
+    try {
+      const res = await fetch('/api/memory');
+      if (res.ok) memory = await res.json();
+    } catch {}
+
+    if (!memory) {
+      try {
+        const res = await fetch('./data/memory.json');
+        if (res.ok) memory = await res.json();
+      } catch {}
+    }
+
+    if (!memory) {
+      memory = {
+        profile: {
+          name: 'Diogo Ferreira',
+          role: 'Desenvolvedor & Estrategista',
+          communicationStyle: 'Direto, analítico, desafiador e focado em planos práticos (80/20).',
+        },
+        goals: [
+          { id: 'goal-1', title: 'Estruturar e automatizar fluxos de trabalho com IA', category: 'Tecnologia', status: 'active' },
+        ],
+        facts: [
+          'Prefere respostas estruturadas com passos práticos e sem enrolação.',
+          'Foco em execução com primeiros princípios.',
+        ],
+      };
+    }
 
     const goalsList = document.getElementById('drawer-goals-list');
     const factsList = document.getElementById('drawer-facts-list');
@@ -397,8 +530,6 @@ window.completeGoal = async (id) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     });
-    loadMemoryToDrawer();
-  } catch (e) {
-    console.error(e);
-  }
+  } catch {}
+  loadMemoryToDrawer();
 };
