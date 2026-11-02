@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./css/style.css?v=5.0">
+  <link rel="stylesheet" href="./css/style.css?v=6.0">
 </head>
 <body>
 
@@ -38,19 +38,19 @@
         <span id="voice-status-text">Voz Serena Ativa</span>
       </div>
 
-      <button id="voice-toggle-btn" class="btn-glass" title="Ligar/Desligar Voz">
+      <button id="voice-toggle-btn" class="btn-glass" onclick="window.toggleVoice()" title="Ligar/Desligar Voz">
         <span class="icon">🔊</span> Voz
       </button>
 
-      <button id="memory-btn" class="btn-glass" title="Aceder à Memória Persistente">
+      <button id="memory-btn" class="btn-glass" onclick="window.toggleMemory(true)" title="Aceder à Memória Persistente">
         🧠 Memória
       </button>
 
-      <button id="settings-btn" class="btn-glass" title="Configurar Chave de API Gemini">
+      <button id="settings-btn" class="btn-glass" onclick="window.toggleSettings(true)" title="Configurar Chave de API Gemini">
         ⚙ Chave Gemini
       </button>
 
-      <button id="immersion-btn" class="btn-glass" title="Ocultar chat e focar no 3D">
+      <button id="immersion-btn" class="btn-glass" onclick="window.toggleImmersion()" title="Ocultar chat e focar no 3D">
         👁 Modo 3D Puro
       </button>
     </div>
@@ -72,15 +72,15 @@
 
     <!-- Sugestões de Início Rápido -->
     <div class="chips-tray">
-      <button class="chip" data-prompt="Onde devo focar a minha energia hoje para ter o maior impacto? Fala comigo com total frontalidade.">🎯 Foco 80/20 de hoje</button>
-      <button class="chip" data-prompt="Tenho um dilema estratégico para resolver. Analisa comigo sem filtros e diz-me a verdade nua e crua.">⚖ Análise sem filtros</button>
-      <button class="chip" data-prompt="Onde é que achas que estou a perder tempo com o acessório em vez do essencial?">⚡ Onde estou a dispersar?</button>
-      <button class="chip" data-prompt="Vamos rever as minhas metas ativas e definir o próximo passo prático sem desculpas.">📋 Revisão de metas</button>
+      <button class="chip" onclick="window.sendPrompt('Onde devo focar a minha energia hoje para ter o maior impacto? Fala comigo com total frontalidade.')">🎯 Foco 80/20 de hoje</button>
+      <button class="chip" onclick="window.sendPrompt('Tenho um dilema estratégico para resolver. Analisa comigo sem filtros e diz-me a verdade nua e crua.')">⚖ Análise sem filtros</button>
+      <button class="chip" onclick="window.sendPrompt('Onde é que achas que estou a perder tempo com o acessório em vez do essencial?')">⚡ Onde estou a dispersar?</button>
+      <button class="chip" onclick="window.sendPrompt('Vamos rever as minhas metas ativas e definir o próximo passo prático sem desculpas.')">📋 Revisão de metas</button>
     </div>
 
     <!-- Barra de Input e Microfone -->
-    <form id="chat-form" class="input-card">
-      <button type="button" id="mic-btn" class="action-btn" title="Falar com o Ricardo (Microfone)">
+    <form id="chat-form" class="input-card" onsubmit="window.handleChatSubmit(event)">
+      <button type="button" id="mic-btn" class="action-btn" onclick="window.toggleMic()" title="Falar com o Ricardo (Microfone)">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
           <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
@@ -107,11 +107,11 @@
   </main>
 
   <!-- Gaveta Lateral de Memória -->
-  <div id="drawer-backdrop" class="drawer-backdrop"></div>
+  <div id="drawer-backdrop" class="drawer-backdrop" onclick="window.toggleMemory(false)"></div>
   <aside id="drawer-panel" class="drawer-panel">
     <div class="drawer-header">
       <h2>Memória do Ricardo</h2>
-      <button id="close-drawer-btn" class="close-btn">&times;</button>
+      <button id="close-drawer-btn" class="close-btn" onclick="window.toggleMemory(false)">&times;</button>
     </div>
 
     <div class="drawer-section">
@@ -130,7 +130,7 @@
           class="chat-input" 
           style="background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border); border-radius: 8px; font-size: 0.82rem;"
         >
-        <button id="add-goal-btn" class="btn-glass" style="padding: 6px 14px; font-size: 0.8rem;">Adicionar</button>
+        <button id="add-goal-btn" class="btn-glass" onclick="window.addGoalFromInput()" style="padding: 6px 14px; font-size: 0.8rem;">Adicionar</button>
       </div>
     </div>
 
@@ -145,18 +145,18 @@
     <div class="modal-card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
         <h2 style="margin-bottom: 0;">Conectar Gemini ao Ricardo</h2>
-        <button id="close-modal-btn" class="close-btn" style="font-size: 1.6rem;" title="Fechar">&times;</button>
+        <button id="close-modal-btn" class="close-btn" onclick="window.toggleSettings(false)" style="font-size: 1.6rem;" title="Fechar">&times;</button>
       </div>
       <p>Para ativar o raciocínio generativo avançado do <strong>Gemini 3.8 Flash</strong>, insira a sua <strong>GEMINI_API_KEY</strong> gratuita.</p>
       <input type="password" id="api-key-input" class="modal-input" placeholder="Cole a sua chave aqui (AIzaSy...)">
       <div style="display: flex; gap: 10px; margin-top: 4px;">
-        <button id="save-key-btn" class="btn-glass send-btn" style="flex: 1; justify-content: center;">Salvar e Conectar</button>
-        <button id="skip-key-btn" class="btn-glass" style="justify-content: center;">Usar Imediatamente</button>
+        <button id="save-key-btn" class="btn-glass send-btn" onclick="window.saveGeminiKey()" style="flex: 1; justify-content: center;">Salvar e Conectar</button>
+        <button id="skip-key-btn" class="btn-glass" onclick="window.toggleSettings(false)" style="justify-content: center;">Usar Imediatamente</button>
       </div>
       <p style="margin-top: 14px; font-size: 0.78rem;">Obtenha a sua chave gratuita em <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--accent-gold-light);">Google AI Studio</a></p>
     </div>
   </div>
 
-  <script type="module" src="./js/app.js?v=5.0"></script>
+  <script type="module" src="./js/app.js?v=6.0"></script>
 </body>
 </html>

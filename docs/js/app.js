@@ -6,13 +6,153 @@ let voice = null;
 let isVoiceEnabled = true;
 let audioUnlocked = false;
 
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('⚡ Inicializando interface do Avatar...');
+// Função universal de desbloqueio de áudio
+function ensureAudio() {
+  if (!audioUnlocked && voice) {
+    voice.ensureAudioContext();
+    audioUnlocked = true;
+  }
+}
 
-  // 1. Configurar eventos de UI em primeiro lugar
-  setupUIEvents();
+// 1. EXPOSIÇÃO IMEDIATA DAS FUNÇÕES NO WINDOW (Garante funcionamento 100% dos cliques em qualquer navegador)
+window.sendPrompt = function (promptText) {
+  ensureAudio();
+  if (promptText) {
+    sendMessage(promptText);
+  }
+};
 
-  // 2. Inicializar áudio com tolerância a falhas
+window.handleChatSubmit = function (e) {
+  if (e) e.preventDefault();
+  ensureAudio();
+  const input = document.getElementById('chat-input');
+  const text = input ? input.value.trim() : '';
+  if (!text) return;
+  sendMessage(text);
+  if (input) input.value = '';
+};
+
+window.toggleVoice = function () {
+  ensureAudio();
+  isVoiceEnabled = !isVoiceEnabled;
+  const btn = document.getElementById('voice-toggle-btn');
+  if (btn) {
+    const icon = btn.querySelector('.icon');
+    if (isVoiceEnabled) {
+      btn.style.color = 'var(--accent-gold-light)';
+      if (icon) icon.textContent = '🔊';
+    } else {
+      if (voice) voice.stopSpeaking();
+      btn.style.color = 'var(--text-dim)';
+      if (icon) icon.textContent = '🔇';
+    }
+  }
+};
+
+window.toggleMemory = function (open) {
+  const backdrop = document.getElementById('drawer-backdrop');
+  const panel = document.getElementById('drawer-panel');
+
+  if (backdrop) {
+    backdrop.classList.toggle('open', !!open);
+    backdrop.style.setProperty('display', open ? 'block' : 'none', 'important');
+  }
+  if (panel) {
+    panel.classList.toggle('open', !!open);
+  }
+  if (open) {
+    loadMemoryToDrawer();
+  }
+};
+
+window.toggleSettings = function (open) {
+  const modal = document.getElementById('api-key-modal');
+  if (modal) {
+    modal.classList.toggle('open', !!open);
+    modal.style.setProperty('display', open ? 'flex' : 'none', 'important');
+  }
+};
+
+window.toggleImmersion = function () {
+  const container = document.getElementById('messages-container');
+  const btn = document.getElementById('immersion-btn');
+  if (container) {
+    container.classList.toggle('minimized');
+    if (btn) {
+      btn.textContent = container.classList.contains('minimized') ? '💬 Mostrar Chat' : '👁 Modo 3D Puro';
+    }
+  }
+};
+
+window.toggleMic = function () {
+  ensureAudio();
+  if (!voice) return;
+
+  if (voice.isListening) {
+    voice.stopListening();
+  } else {
+    voice.startListening(
+      (transcript) => {
+        const input = document.getElementById('chat-input');
+        if (input) input.value = transcript;
+        sendMessage(transcript);
+        if (input) input.value = '';
+      },
+      (err) => {
+        console.warn('Microfone:', err);
+        appendMessage('avatar', 'Aviso: Permita o acesso ao microfone no navegador para conversar por voz.');
+      }
+    );
+  }
+};
+
+window.saveGeminiKey = function () {
+  const input = document.getElementById('api-key-input');
+  const key = input ? input.value.trim() : '';
+  if (!key) return;
+
+  localStorage.setItem('gemini_api_key', key);
+
+  fetch('/api/config/key', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ apiKey: key }),
+  }).catch(() => {});
+
+  window.toggleSettings(false);
+  checkServerStatus();
+
+  appendMessage('avatar', 'Excelente, Diogo. A chave Gemini foi ligada com sucesso! O raciocínio generativo avançado está ativo.');
+  if (voice && isVoiceEnabled) {
+    voice.speak('Excelente, Diogo. A chave Gemini foi ligada com sucesso! O raciocínio generativo avançado está ativo.');
+  }
+};
+
+window.addGoalFromInput = function () {
+  const input = document.getElementById('new-goal-input');
+  const val = input ? input.value.trim() : '';
+  if (!val) return;
+
+  fetch('/api/memory/goal', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: val, category: 'Estratégia' }),
+  })
+    .then(() => {
+      if (input) input.value = '';
+      loadMemoryToDrawer();
+    })
+    .catch(() => {
+      if (input) input.value = '';
+      loadMemoryToDrawer();
+    });
+};
+
+// 2. INICIALIZAÇÃO DA APLICAÇÃO
+function initApp() {
+  console.log('⚡ Inicializando sistema do Avatar...');
+
+  // Inicializar Áudio
   try {
     voice = new VoiceController({
       onLipSyncUpdate: (amplitude) => {
@@ -37,30 +177,31 @@ document.addEventListener('DOMContentLoaded', () => {
       },
     });
   } catch (err) {
-    console.warn('Aviso ao inicializar áudio:', err);
+    console.warn('Áudio inicializado em modo fallback:', err);
   }
 
-  // 3. Inicializar Avatar 3D com tolerância a falhas
+  // Inicializar 3D
   try {
     avatar = new RicardoAvatar3D('canvas3d-container');
   } catch (err) {
-    console.error('Aviso ao inicializar Avatar 3D (WebGL):', err);
+    console.error('WebGL 3D fallback:', err);
   }
 
-  // 4. Desbloqueio de áudio na primeira interação do utilizador
-  const unlockAudio = () => {
-    if (!audioUnlocked) {
-      if (voice) voice.ensureAudioContext();
-      audioUnlocked = true;
-    }
-  };
-  window.addEventListener('click', unlockAudio, { capture: true, once: true });
-  window.addEventListener('keydown', unlockAudio, { capture: true, once: true });
-  window.addEventListener('touchstart', unlockAudio, { capture: true, once: true });
+  // Ouvintes de primeira interação para áudio
+  window.addEventListener('click', ensureAudio, { capture: true, once: true });
+  window.addEventListener('keydown', ensureAudio, { capture: true, once: true });
+  window.addEventListener('touchstart', ensureAudio, { capture: true, once: true });
 
-  // 5. Verificar estado do servidor ou chave local
+  // Verificar status da chave
   checkServerStatus();
-});
+}
+
+// Disparo seguro (executa de imediato se o DOM já estiver pronto)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
 
 async function checkServerStatus() {
   const settingsBtn = document.getElementById('settings-btn');
@@ -73,7 +214,6 @@ async function checkServerStatus() {
       isReady = !!data.ready;
     }
   } catch {
-    // Se não há backend (hospedagem estática GitHub Pages), verifica chave no localStorage
     isReady = !!localStorage.getItem('gemini_api_key');
   }
 
@@ -88,204 +228,7 @@ async function checkServerStatus() {
   }
 }
 
-function setupUIEvents() {
-  const chatForm = document.getElementById('chat-form');
-  const chatInput = document.getElementById('chat-input');
-  const messagesContainer = document.getElementById('messages-container');
-  const apiKeyModal = document.getElementById('api-key-modal');
-  const drawerPanel = document.getElementById('drawer-panel');
-  const drawerBackdrop = document.getElementById('drawer-backdrop');
-
-  // Envio de formulário de texto
-  if (chatForm) {
-    chatForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const text = chatInput ? chatInput.value.trim() : '';
-      if (!text) return;
-      sendMessage(text);
-      if (chatInput) chatInput.value = '';
-    });
-  }
-
-  // DELEGAÇÃO GLOBAL DE CLIQUES: garante que NENHUM clique em botão é perdido
-  document.addEventListener('click', (e) => {
-    // 1. Clique nos Chips de Tópicos
-    const chip = e.target.closest('.chip');
-    if (chip) {
-      e.preventDefault();
-      e.stopPropagation();
-      const prompt = chip.getAttribute('data-prompt') || chip.innerText.trim();
-      console.log('Tópico selecionado:', prompt);
-      sendMessage(prompt);
-      return;
-    }
-
-    // 2. Microfone
-    const micBtn = e.target.closest('#mic-btn');
-    if (micBtn) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (!voice) return;
-      voice.ensureAudioContext();
-      if (voice.isListening) {
-        voice.stopListening();
-      } else {
-        voice.startListening(
-          (transcript) => {
-            if (chatInput) chatInput.value = transcript;
-            sendMessage(transcript);
-            if (chatInput) chatInput.value = '';
-          },
-          (err) => {
-            console.warn('Microfone:', err);
-            appendMessage('avatar', 'Aviso: Permita o acesso ao microfone no navegador para falar com o Ricardo.');
-          }
-        );
-      }
-      return;
-    }
-
-    // 3. Alternar Voz (Ligar/Desligar)
-    const voiceToggleBtn = e.target.closest('#voice-toggle-btn');
-    if (voiceToggleBtn) {
-      e.preventDefault();
-      isVoiceEnabled = !isVoiceEnabled;
-      const icon = voiceToggleBtn.querySelector('.icon');
-      if (isVoiceEnabled) {
-        voiceToggleBtn.style.color = 'var(--accent-gold-light)';
-        if (icon) icon.textContent = '🔊';
-      } else {
-        if (voice) voice.stopSpeaking();
-        voiceToggleBtn.style.color = 'var(--text-dim)';
-        if (icon) icon.textContent = '🔇';
-      }
-      return;
-    }
-
-    // 4. Abrir Gaveta de Memória
-    const memoryBtn = e.target.closest('#memory-btn');
-    if (memoryBtn) {
-      e.preventDefault();
-      toggleDrawer(true);
-      return;
-    }
-
-    // 5. Fechar Gaveta de Memória
-    const closeDrawerBtn = e.target.closest('#close-drawer-btn');
-    if (closeDrawerBtn) {
-      e.preventDefault();
-      toggleDrawer(false);
-      return;
-    }
-
-    if (e.target === drawerBackdrop) {
-      toggleDrawer(false);
-      return;
-    }
-
-    // 6. Botão de Configuração de Chave Gemini
-    const settingsBtn = e.target.closest('#settings-btn');
-    if (settingsBtn) {
-      e.preventDefault();
-      if (apiKeyModal) {
-        apiKeyModal.classList.add('open');
-        apiKeyModal.style.setProperty('display', 'flex', 'important');
-      }
-      return;
-    }
-
-    // 7. Fechar Modal de Chave
-    const closeModalBtn = e.target.closest('#close-modal-btn');
-    const skipKeyBtn = e.target.closest('#skip-key-btn');
-    if (closeModalBtn || skipKeyBtn) {
-      e.preventDefault();
-      if (apiKeyModal) {
-        apiKeyModal.classList.remove('open');
-        apiKeyModal.style.setProperty('display', 'none', 'important');
-      }
-      return;
-    }
-
-    // 8. Salvar Chave Gemini
-    const saveKeyBtn = e.target.closest('#save-key-btn');
-    if (saveKeyBtn) {
-      e.preventDefault();
-      const input = document.getElementById('api-key-input');
-      const key = input ? input.value.trim() : '';
-      if (!key) return;
-
-      // Salva no localStorage para funcionar mesmo sem backend (ex: GitHub Pages)
-      localStorage.setItem('gemini_api_key', key);
-
-      // Tenta salvar também no backend se disponível
-      fetch('/api/config/key', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: key }),
-      }).catch(() => {});
-
-      if (apiKeyModal) {
-        apiKeyModal.classList.remove('open');
-        apiKeyModal.style.setProperty('display', 'none', 'important');
-      }
-      checkServerStatus();
-      appendMessage('avatar', 'Excelente, Diogo. A chave Gemini foi ligada com sucesso! O raciocínio generativo avançado está ativo.');
-      if (voice && isVoiceEnabled) {
-        voice.speak('Excelente, Diogo. A chave Gemini foi ligada com sucesso! O raciocínio generativo avançado está ativo.');
-      }
-      return;
-    }
-
-    // 9. Modo Imersão (Modo 3D Puro)
-    const immersionBtn = e.target.closest('#immersion-btn');
-    if (immersionBtn) {
-      e.preventDefault();
-      if (messagesContainer) {
-        messagesContainer.classList.toggle('minimized');
-        immersionBtn.textContent = messagesContainer.classList.contains('minimized') ? '💬 Mostrar Chat' : '👁 Modo 3D Puro';
-      }
-      return;
-    }
-
-    // 10. Adicionar Meta
-    const addGoalBtn = e.target.closest('#add-goal-btn');
-    if (addGoalBtn) {
-      e.preventDefault();
-      const input = document.getElementById('new-goal-input');
-      const val = input ? input.value.trim() : '';
-      if (!val) return;
-      fetch('/api/memory/goal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: val, category: 'Estratégia' }),
-      })
-        .then(() => {
-          if (input) input.value = '';
-          loadMemoryToDrawer();
-        })
-        .catch(() => {
-          // Salva localmente caso sem backend
-          if (input) input.value = '';
-          loadMemoryToDrawer();
-        });
-      return;
-    }
-  });
-
-  // Funções auxiliares
-  function toggleDrawer(open) {
-    if (drawerBackdrop) {
-      drawerBackdrop.classList.toggle('open', open);
-      drawerBackdrop.style.setProperty('display', open ? 'block' : 'none', 'important');
-    }
-    if (drawerPanel) {
-      drawerPanel.classList.toggle('open', open);
-    }
-    if (open) loadMemoryToDrawer();
-  }
-}
-
-// Motor de conselho direto de Ricardo no cliente (garante funcionamento 100% autônomo e offline)
+// Motor de conselho direto de Ricardo
 function generateClientMentorAdvice(message) {
   const lower = (message || '').toLowerCase();
 
@@ -334,7 +277,6 @@ Sobre "${message}": a minha resposta é direta e sem filtros. Não procures atal
 Diz-me com franqueza: qual é o resultado mensurável e prático que queres alcançar aqui, e qual é a primeira ação que podes executar hoje?`;
 }
 
-// Chamada direta à API Gemini quando executado como frontend estático
 async function callGeminiDirect(message, apiKey) {
   const prompt = `Você é o Ricardo, o conselheiro pessoal de confiança, consultor estratégico e mentor executivo de Diogo Ferreira.
 Voz masculina suave, simpática, acolhedora, frontal, direta e sem filtros. Responda diretamente a Diogo Ferreira sem rodeios corporativos:
@@ -358,18 +300,16 @@ Mensagem de Diogo: "${message}"`;
 }
 
 async function sendMessage(text) {
-  if (voice) voice.ensureAudioContext();
+  ensureAudio();
 
   appendMessage('user', text);
 
-  // Criar indicador de resposta do Ricardo
   const loadingId = appendMessage('avatar', 'Ricardo a refletir com frontalidade e serenidade...', true);
 
   try {
     let replyText = '';
     let replyAudio = null;
 
-    // 1. Tentar obter do servidor Express backend
     try {
       const res = await fetch('/api/chat', {
         method: 'POST',
@@ -381,11 +321,8 @@ async function sendMessage(text) {
         replyText = data.text;
         replyAudio = data.audio;
       }
-    } catch {
-      // Backend inacessível (ex: GitHub Pages)
-    }
+    } catch {}
 
-    // 2. Se backend não responder, usar Gemini direto ou motor autónomo
     if (!replyText) {
       const storedKey = localStorage.getItem('gemini_api_key');
       if (storedKey) {
@@ -402,7 +339,6 @@ async function sendMessage(text) {
     removeMessage(loadingId);
     appendMessage('avatar', replyText);
 
-    // Reproduzir voz do Ricardo com Lip-Sync
     if (voice && isVoiceEnabled) {
       voice.speak(replyText, replyAudio);
     }
