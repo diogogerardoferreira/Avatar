@@ -28,11 +28,17 @@ export class RicardoAvatar3D {
     this.saccadeOffset = { x: 0, y: 0 };
     this.nodAmount = 0;
 
-    // Arrays para deformação de vértices
+    // Arrays para deformação e articulação de vértices anatômicos
     this.basePositions = null;
     this.mouthVertices = [];
     this.eyeVertices = [];
     this.browVertices = [];
+    this.chinVertices = [];
+
+    // Dinâmicas de corpo e postura expressiva
+    this.currentBodyLean = 0;
+    this.targetBodyLean = 0;
+    this.acknowledgementTimer = 0;
 
     this.init();
   }
@@ -216,8 +222,8 @@ export class RicardoAvatar3D {
           posAttr.setZ(i, z);
 
           // Mapear Vértices da Boca para Sincronização Labial (Lip-Sync anatômico)
-          if (Math.abs(x) < 0.25 && y > -0.46 && y < -0.22) {
-            const weightX = 1 - Math.abs(x) / 0.25;
+          if (Math.abs(x) < 0.28 && y > -0.46 && y < -0.22) {
+            const weightX = 1 - Math.abs(x) / 0.28;
             const weightY = 1 - Math.abs(y - (-0.34)) / 0.12;
             const weight = Math.max(0, weightX * weightY);
             if (weight > 0.02) {
@@ -233,7 +239,34 @@ export class RicardoAvatar3D {
             }
           }
 
-          // Mapear Vértices dos Olhos para Piscar Realista
+          // Mapear Vértices do Maxilar e Barba (para que a mandíbula acompanhe a fala)
+          if (y <= -0.44 && y > -0.82 && Math.abs(x) < 0.38) {
+            const chinWeight = Math.max(0, 1 - Math.abs(y - (-0.58)) / 0.22) * Math.max(0, 1 - Math.abs(x) / 0.38);
+            if (chinWeight > 0.03) {
+              this.chinVertices.push({
+                index: i,
+                weight: chinWeight,
+                baseX: x,
+                baseY: y,
+                baseZ: z,
+              });
+            }
+          }
+
+          // Mapear Vértices das Sobrancelhas para Expressividade na Fala
+          if (y > 0.50 && y < 0.76 && Math.abs(x) < 0.65) {
+            const browWeight = Math.max(0, 1 - Math.abs(y - 0.62) / 0.13) * Math.max(0, 1 - Math.abs(x) / 0.65);
+            if (browWeight > 0.04) {
+              this.browVertices.push({
+                index: i,
+                weight: browWeight,
+                baseY: y,
+                baseZ: z,
+              });
+            }
+          }
+
+          // Mapear Vértices dos Olhos para Piscar Realista e Sorriso com os Olhos
           if (y > 0.32 && y < 0.48 && (Math.abs(x) > 0.14 && Math.abs(x) < 0.40)) {
             const eyeWeight = 1 - Math.abs(y - 0.40) / 0.09;
             if (eyeWeight > 0.05) {
@@ -330,9 +363,13 @@ export class RicardoAvatar3D {
     this.renderer.setSize(width, height);
   }
 
+  triggerAcknowledge() {
+    this.acknowledgementTimer = 0.7; // Suave assentimento reflexivo ao receber mensagem
+  }
+
   setLipSync(amplitude) {
     this.targetLipSync = Math.min(1.0, Math.max(0, amplitude));
-    this.isSpeaking = this.targetLipSync > 0.04;
+    this.isSpeaking = this.targetLipSync > 0.035;
   }
 
   animate() {
@@ -341,65 +378,92 @@ export class RicardoAvatar3D {
     const delta = this.clock.getDelta();
     const time = this.clock.getElapsedTime();
 
-    // 1. Damping suave do rastreamento do olhar (olhar frontal acolhedor)
-    this.mouse.x += (this.mouse.targetX - this.mouse.x) * 0.04;
-    this.mouse.y += (this.mouse.targetY - this.mouse.y) * 0.04;
+    // 1. Damping suave do olhar para contato visual direto e frontal ("olhos nos olhos")
+    this.mouse.x += (this.mouse.targetX - this.mouse.x) * 0.045;
+    this.mouse.y += (this.mouse.targetY - this.mouse.y) * 0.045;
 
-    // 2. Micro-sacadas oculares (olhar humano vivo e atento, nunca estático)
+    // 2. Micro-sacadas oculares humanas (olhar atento, vivo e pensativo)
     this.saccadeTimer += delta;
     if (this.saccadeTimer > 2.8) {
       this.saccadeTimer = 0;
-      this.saccadeOffset.x = (Math.random() - 0.5) * 0.008;
-      this.saccadeOffset.y = (Math.random() - 0.5) * 0.005;
+      this.saccadeOffset.x = (Math.random() - 0.5) * 0.009;
+      this.saccadeOffset.y = (Math.random() - 0.5) * 0.006;
     }
 
-    if (this.headGroup) {
-      // Olhar frontal e direto: a cabeça segue o utilizador de forma sutil, mantendo contato visual direto
-      const headRotY = this.mouse.x * 0.22 + this.saccadeOffset.x;
-      const headRotX = -this.mouse.y * 0.12 + this.saccadeOffset.y;
+    // 3. Postura e Movimentos Corporais Vivos (Peito, Ombros e Busto)
+    if (this.avatarGroup) {
+      // Inclinação corporal conversacional: ao falar, aproxima-se com empatia e autoridade fraterna
+      this.targetBodyLean = this.isSpeaking ? 0.08 : 0.0;
+      this.currentBodyLean += (this.targetBodyLean - this.currentBodyLean) * 0.06;
+      this.avatarGroup.position.z = this.currentBodyLean;
+      this.avatarGroup.rotation.x = this.isSpeaking ? 0.022 : 0.0;
 
-      // Suave assentimento ao falar ou escutar (micro-nod compreensivo)
-      if (this.isSpeaking) {
-        this.nodAmount = Math.sin(time * 3.5) * 0.025 * this.lipSyncValue;
-      } else {
-        // Respiração e presença atenta
-        this.nodAmount = Math.sin(time * 1.2) * 0.01;
-      }
+      // Micro-oscilação natural do corpo (balanço involuntário do tronco)
+      const torsoSwayX = Math.sin(time * 0.45) * 0.014;
+      const torsoSwayRoll = Math.sin(time * 0.45) * 0.007;
+      this.avatarGroup.position.x = torsoSwayX;
+      this.avatarGroup.rotation.z = torsoSwayRoll;
 
-      this.headGroup.rotation.y = headRotY;
-      this.headGroup.rotation.x = headRotX + this.nodAmount;
-
-      // Respiração natural do peito e corpo
-      const breathing = Math.sin(time * 1.35) * 0.02;
+      // Respiração orgânica multidimensional (elevação e expansão torácica)
+      const breathing = Math.sin(time * 1.3) * 0.022;
+      const breathExpand = Math.cos(time * 1.3) * 0.012;
       this.avatarGroup.position.y = breathing;
       this.avatarGroup.scale.set(
-        1.0 + breathing * 0.08,
-        1.0 + breathing * 0.12,
-        1.0 + breathing * 0.08
+        1.0 + breathExpand,
+        1.0 + breathing * 0.7,
+        1.0 + breathExpand
       );
     }
 
-    // 3. Aura suave de presença e serenidade
+    // 4. Gestos Naturais de Cabeça durante a Fala e Escuta Atenta
+    if (this.headGroup) {
+      const gazeY = this.mouse.x * 0.18 + this.saccadeOffset.x;
+      const gazeX = -this.mouse.y * 0.10 + this.saccadeOffset.y;
+
+      // Gestos comunicativos durante a fala (inflexões orais, ênfase de ideias e pausas)
+      const speechNod = (Math.sin(time * 3.6) * 0.035 + Math.sin(time * 1.8) * 0.02) * this.lipSyncValue;
+      const speechTilt = Math.sin(time * 2.2) * 0.024 * this.lipSyncValue;
+      const speechTurn = Math.cos(time * 1.4) * 0.026 * this.lipSyncValue;
+      const headLean = 0.02 * this.lipSyncValue;
+
+      // Postura atenta quando está em silêncio (ouvindo ou refletindo)
+      const listeningTilt = Math.sin(time * 0.55) * 0.012;
+      const breathingNod = Math.sin(time * 1.1) * 0.008;
+
+      // Assentimento consciente quando o usuário envia uma reflexão
+      let ackNod = 0;
+      if (this.acknowledgementTimer > 0) {
+        this.acknowledgementTimer = Math.max(0, this.acknowledgementTimer - delta);
+        const ackProgress = (0.7 - this.acknowledgementTimer) / 0.7;
+        ackNod = Math.sin(ackProgress * Math.PI) * 0.045;
+      }
+
+      this.headGroup.rotation.y = gazeY + (this.isSpeaking ? speechTurn : 0);
+      this.headGroup.rotation.x = gazeX + (this.isSpeaking ? (speechNod + headLean) : breathingNod) + ackNod;
+      this.headGroup.rotation.z = (this.isSpeaking ? speechTilt : listeningTilt);
+    }
+
+    // 5. Aura serena pulsante de fundo
     if (this.auraMesh) {
       const auraPulse = this.isSpeaking
-        ? Math.sin(time * 6.0) * 0.06 + 0.14
-        : Math.sin(time * 1.8) * 0.02 + 0.07;
+        ? Math.sin(time * 5.5) * 0.06 + 0.15
+        : Math.sin(time * 1.6) * 0.02 + 0.07;
       this.auraMesh.material.opacity = auraPulse;
       this.auraMesh.rotation.z += 0.0015;
     }
 
-    // 4. Piscar natural e fluido dos olhos
+    // 6. Piscar natural das pálpebras
     this.blinkTimer += delta;
     if (this.blinkTimer > this.nextBlinkInterval) {
       this.isBlinking = true;
       this.blinkTimer = 0;
       this.blinkProgress = 0;
-      this.nextBlinkInterval = 3.2 + Math.random() * 3.0; // Intervalo natural aleatório
+      this.nextBlinkInterval = 3.0 + Math.random() * 2.8;
     }
 
     let currentBlink = 0;
     if (this.isBlinking) {
-      this.blinkProgress += delta * 8.0; // Duração rápida ~ 130ms
+      this.blinkProgress += delta * 8.5; // Duração rápida ~ 120ms
       if (this.blinkProgress >= Math.PI) {
         this.isBlinking = false;
         currentBlink = 0;
@@ -408,26 +472,29 @@ export class RicardoAvatar3D {
       }
     }
 
-    // 5. Interpolação suave do Lip-Sync (movimento labial)
-    this.lipSyncValue += (this.targetLipSync - this.lipSyncValue) * 0.32;
+    // 7. Interpolação suave e orgânica do Lip-Sync
+    this.lipSyncValue += (this.targetLipSync - this.lipSyncValue) * 0.35;
 
-    // 6. Atualização de vértices na geometria 3D (Boca, Maxilar e Pálpebras)
+    // 8. Articulação Tridimensional de Vértices Faciais (Boca, Maxilar, Barba, Sobrancelhas e Olhos)
     if (this.avatarMesh && this.basePositions) {
       const posAttr = this.avatarMesh.geometry.attributes.position;
       let needsUpdate = false;
 
-      // Sincronização Labial tridimensional
+      const mouthOpen = this.lipSyncValue * 0.16;
+
+      // A) Sincronização Labial tridimensional (abertura, projeção e largura fonética)
       if (this.mouthVertices.length > 0) {
-        const mouthOpen = this.lipSyncValue * 0.14;
         for (const item of this.mouthVertices) {
           if (item.isLowerLip) {
-            // Lábio inferior e maxilar descem e projetam para a frente
-            const newY = item.baseY - (mouthOpen * 0.9 * item.weight);
-            const newZ = item.baseZ + (mouthOpen * 0.08 * item.weight);
+            // Lábio inferior desce, avança em Z e abre ligeiramente nas comissuras laterais
+            const newY = item.baseY - (mouthOpen * 0.95 * item.weight);
+            const newZ = item.baseZ + (mouthOpen * 0.12 * item.weight);
+            const newX = item.baseX * (1.0 + mouthOpen * 0.22 * item.weight);
+            posAttr.setX(item.index, newX);
             posAttr.setY(item.index, newY);
             posAttr.setZ(item.index, newZ);
           } else {
-            // Lábio superior move-se levemente
+            // Lábio superior eleva-se suavemente
             const newY = item.baseY + (mouthOpen * 0.22 * item.weight);
             posAttr.setY(item.index, newY);
           }
@@ -435,11 +502,34 @@ export class RicardoAvatar3D {
         needsUpdate = true;
       }
 
-      // Piscar das pálpebras
-      if (this.eyeVertices.length > 0 && currentBlink > 0.005) {
+      // B) Maxilar e Barba acompanham o movimento da fala
+      if (this.chinVertices.length > 0) {
+        const chinDrop = mouthOpen * 0.52;
+        for (const item of this.chinVertices) {
+          const newY = item.baseY - (chinDrop * item.weight);
+          const newZ = item.baseZ + (chinDrop * 0.25 * item.weight);
+          posAttr.setY(item.index, newY);
+          posAttr.setZ(item.index, newZ);
+        }
+        needsUpdate = true;
+      }
+
+      // C) Sobrancelhas expressivas (elevação nas ênfases de fala)
+      if (this.browVertices.length > 0) {
+        const browRaise = (Math.sin(time * 3.0) * 0.014 + 0.012) * this.lipSyncValue;
+        for (const item of this.browVertices) {
+          const newY = item.baseY + browRaise * item.weight;
+          posAttr.setY(item.index, newY);
+        }
+        needsUpdate = true;
+      }
+
+      // D) Pálpebras e sorriso caloroso nos olhos (Duchenne smile)
+      if (this.eyeVertices.length > 0) {
         const eyeOffset = currentBlink * 0.045;
+        const smileSquinch = this.lipSyncValue * 0.007; // Olhos estreitam suavemente ao falar com calor humano
         for (const item of this.eyeVertices) {
-          const newY = item.baseY - eyeOffset * item.weight;
+          const newY = item.baseY - (eyeOffset + smileSquinch) * item.weight;
           posAttr.setY(item.index, newY);
         }
         needsUpdate = true;

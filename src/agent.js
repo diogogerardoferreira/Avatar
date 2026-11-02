@@ -6,6 +6,29 @@ import {
   addDecision,
   addSessionSummary
 } from './memory.js';
+function pcmToWav(pcmBuffer, sampleRate = 24000, numChannels = 1, bitsPerSample = 16) {
+  const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+  const blockAlign = numChannels * (bitsPerSample / 8);
+  const dataSize = pcmBuffer.length;
+  const buffer = Buffer.alloc(44 + dataSize);
+
+  buffer.write('RIFF', 0);
+  buffer.writeUInt32LE(36 + dataSize, 4);
+  buffer.write('WAVE', 8);
+  buffer.write('fmt ', 12);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(numChannels, 22);
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(byteRate, 28);
+  buffer.writeUInt16LE(blockAlign, 32);
+  buffer.writeUInt16LE(bitsPerSample, 34);
+  buffer.write('data', 36);
+  buffer.writeUInt32LE(dataSize, 40);
+
+  pcmBuffer.copy(buffer, 44);
+  return buffer;
+}
 
 export class AvatarAgent {
   constructor({ apiKey, model = 'gemini-3.8-flash', enableSearch = false }) {
@@ -162,38 +185,35 @@ Responda APENAS um JSON no seguinte formato (sem markdown code blocks):
         .replace(/\s+/g, ' ')
         .trim();
 
-      // Limita o tamanho por turno para resposta rápida de áudio
-      const textToSpeak = cleanText.length > 800 ? cleanText.slice(0, 800) + '...' : cleanText;
+      // Limita o tamanho por turno para resposta rápida e natural
+      const textToSpeak = cleanText.length > 500 ? cleanText.slice(0, 500) + '...' : cleanText;
 
-      const interaction = await this.client.interactions.create({
-        model: 'gemini-3.8-flash-tts',
-        input: [{
-          type: 'user_input',
-          content: [{
-            type: 'text',
-            text: textToSpeak,
-            annotations: [{
-              type: 'speech_metadata',
-              style: 'warm, friendly, soft and welcoming male voice, direct, candid, honest and grounded presence with serene cadence',
-            }],
-          }],
-        }],
-        response_format: { type: 'audio' },
-        generation_config: {
-          speech_config: [
-            { voice: 'Sulafat' },
-          ],
+      const res = await this.client.models.generateContent({
+        model: 'gemini-2.5-flash-preview-tts',
+        contents: textToSpeak,
+        config: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: 'Charon', // Voz masculina, profunda, calorosa, natural e frontal
+              },
+            },
+          },
         },
       });
 
-      if (interaction.output_audio?.data) {
+      const audioPart = res.candidates?.[0]?.content?.parts?.find((p) => p.inlineData);
+      if (audioPart?.inlineData?.data) {
+        const rawPcm = Buffer.from(audioPart.inlineData.data, 'base64');
+        const wavBuffer = pcmToWav(rawPcm, 24000, 1, 16);
         return {
-          audioBase64: interaction.output_audio.data,
+          audioBase64: wavBuffer.toString('base64'),
           mimeType: 'audio/wav',
         };
       }
     } catch (err) {
-      console.warn('Gemini TTS indisponível no momento, utilizando voz do navegador:', err.message);
+      console.warn('Gemini TTS em fallback para sintetizador do navegador:', err.message);
     }
     return null;
   }

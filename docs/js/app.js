@@ -315,6 +315,10 @@ Mensagem de Diogo: "${message}"`;
 async function sendMessage(text) {
   ensureAudio();
 
+  if (avatar) {
+    avatar.triggerAcknowledge();
+  }
+
   appendMessage('user', text);
 
   const loadingId = appendMessage('avatar', 'Ricardo a refletir com frontalidade e serenidade...', true);
