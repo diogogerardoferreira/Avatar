@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ricardo — Conselheiro & Mentor Estratégico 3D</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/style.css?v=4.0">
+</head>
+<body>
+
+  <!-- Viewport 3D do Ricardo -->
+  <div id="canvas3d-container"></div>
+
+  <!-- Vinheta Atmosférica de Iluminação e Profundidade -->
+  <div class="vignette-overlay"></div>
+
+  <!-- Barra Superior -->
+  <header class="top-header">
+    <div class="avatar-badge">
+      <img src="/ricardo.jpg" alt="Ricardo" class="avatar-thumbnail">
+      <div class="avatar-meta">
+        <h1>Ricardo</h1>
+        <p><span class="status-dot"></span> Conselheiro & Mentor Estratégico</p>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <div class="voice-indicator">
+        <div class="wave-bars">
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+          <div class="wave-bar"></div>
+        </div>
+        <span id="voice-status-text">Voz Serena Ativa</span>
+      </div>
+
+      <button id="voice-toggle-btn" class="btn-glass" title="Ligar/Desligar Voz">
+        <span class="icon">🔊</span> Voz
+      </button>
+
+      <button id="memory-btn" class="btn-glass" title="Aceder à Memória Persistente">
+        🧠 Memória
+      </button>
+
+      <button id="settings-btn" class="btn-glass" title="Configurar Chave de API Gemini">
+        ⚙ Chave Gemini
+      </button>
+
+      <button id="immersion-btn" class="btn-glass" title="Ocultar chat e focar no 3D">
+        👁 Modo 3D Puro
+      </button>
+    </div>
+  </header>
+
+  <!-- Dock Principal de Conversa -->
+  <main class="chat-dock">
+    <!-- Caixa de Mensagens -->
+    <div id="messages-container" class="messages-container">
+      <div class="message avatar">
+        <span class="message-sender">Ricardo</span>
+        <div class="message-bubble">
+          <p>Olá, <strong>Diogo</strong>. É um gosto enorme estar aqui contigo, olhos nos olhos.</p>
+          <p>Sou o teu conselheiro e mentor estratégico. Aqui falamos <strong>com o coração aberto, acolhimento genuíno e verdade frontal — sem filtros e sem rodeios</strong>.</p>
+          <p>Diz-me com franqueza: qual é a decisão, dilema ou projeto em que temos de pôr ordem e foco hoje?</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sugestões de Início Rápido -->
+    <div class="chips-tray">
+      <button class="chip" data-prompt="Onde devo focar a minha energia hoje para ter o maior impacto? Fala comigo com total frontalidade.">🎯 Foco 80/20 de hoje</button>
+      <button class="chip" data-prompt="Tenho um dilema estratégico para resolver. Analisa comigo sem filtros e diz-me a verdade nua e crua.">⚖ Análise sem filtros</button>
+      <button class="chip" data-prompt="Onde é que achas que estou a perder tempo com o acessório em vez do essencial?">⚡ Onde estou a dispersar?</button>
+      <button class="chip" data-prompt="Vamos rever as minhas metas ativas e definir o próximo passo prático sem desculpas.">📋 Revisão de metas</button>
+    </div>
+
+    <!-- Barra de Input e Microfone -->
+    <form id="chat-form" class="input-card">
+      <button type="button" id="mic-btn" class="action-btn" title="Falar com o Ricardo (Microfone)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+          <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+          <line x1="12" y1="19" x2="12" y2="23"></line>
+          <line x1="8" y1="23" x2="16" y2="23"></line>
+        </svg>
+      </button>
+
+      <input 
+        type="text" 
+        id="chat-input" 
+        class="chat-input" 
+        placeholder="Fala ou escreve a tua reflexão para o Ricardo..." 
+        autocomplete="off"
+      >
+
+      <button type="submit" class="action-btn send-btn" title="Enviar Mensagem">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+      </button>
+    </form>
+  </main>
+
+  <!-- Gaveta Lateral de Memória -->
+  <div id="drawer-backdrop" class="drawer-backdrop"></div>
+  <aside id="drawer-panel" class="drawer-panel">
+    <div class="drawer-header">
+      <h2>Memória do Ricardo</h2>
+      <button id="close-drawer-btn" class="close-btn">&times;</button>
+    </div>
+
+    <div class="drawer-section">
+      <h3>Perfil do Utilizador</h3>
+      <div id="drawer-profile-info"></div>
+    </div>
+
+    <div class="drawer-section">
+      <h3>Metas Ativas</h3>
+      <div id="drawer-goals-list"></div>
+      <div style="display: flex; gap: 8px; margin-top: 10px;">
+        <input 
+          type="text" 
+          id="new-goal-input" 
+          placeholder="Nova meta..." 
+          class="chat-input" 
+          style="background: rgba(255,255,255,0.06); border: 1px solid var(--glass-border); border-radius: 8px; font-size: 0.82rem;"
+        >
+        <button id="add-goal-btn" class="btn-glass" style="padding: 6px 14px; font-size: 0.8rem;">Adicionar</button>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h3>Fatos e Aprendizados Conhecidos</h3>
+      <div id="drawer-facts-list"></div>
+    </div>
+  </aside>
+
+  <!-- Modal de Configuração de Chave de API (se necessário) -->
+  <div id="api-key-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h2 style="margin-bottom: 0;">Conectar Gemini ao Ricardo</h2>
+        <button id="close-modal-btn" class="close-btn" style="font-size: 1.6rem;" title="Fechar">&times;</button>
+      </div>
+      <p>Para ativar o raciocínio generativo avançado do <strong>Gemini 3.8 Flash</strong>, insira a sua <strong>GEMINI_API_KEY</strong> gratuita.</p>
+      <input type="password" id="api-key-input" class="modal-input" placeholder="Cole a sua chave aqui (AIzaSy...)">
+      <div style="display: flex; gap: 10px; margin-top: 4px;">
+        <button id="save-key-btn" class="btn-glass send-btn" style="flex: 1; justify-content: center;">Salvar e Conectar</button>
+        <button id="skip-key-btn" class="btn-glass" style="justify-content: center;">Usar Imediatamente</button>
+      </div>
+      <p style="margin-top: 14px; font-size: 0.78rem;">Obtenha a sua chave gratuita em <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--accent-gold-light);">Google AI Studio</a></p>
+    </div>
+  </div>
+
+  <script type="module" src="/js/app.js?v=4.0"></script>
+</body>
+</html>

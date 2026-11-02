@@ -1,0 +1,4 @@
+node_modules/
+.env
+data/history/*.md
+npm-debug.log*

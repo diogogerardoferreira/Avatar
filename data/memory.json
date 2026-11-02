@@ -1,0 +1,35 @@
+{
+  "profile": {
+    "name": "Diogo Ferreira",
+    "role": "Desenvolvedor & Estrategista",
+    "bio": "Profissional focado em inovação, tecnologia, inteligência artificial e resolução de problemas complexos.",
+    "communicationStyle": "Direto, analítico, desafiador e focado em planos práticos e de alto impacto.",
+    "coreValues": [
+      "Execução rápida com qualidade",
+      "Aprendizado contínuo e autonomia",
+      "Pensamento de primeiros princípios",
+      "Foco em resultados mensuráveis (80/20)"
+    ]
+  },
+  "goals": [
+    {
+      "id": "goal-1",
+      "title": "Estruturar e automatizar fluxos de trabalho com IA",
+      "category": "Tecnologia / Produtividade",
+      "status": "active",
+      "createdAt": "2026-10-30T16:43:44.226Z"
+    }
+  ],
+  "facts": [
+    "Utiliza ambiente Windows com Node.js e ecossistema moderno.",
+    "Prefere respostas estruturadas com passos práticos e sem enrolação."
+  ],
+  "decisions": [],
+  "sessionSummaries": [],
+  "avatar": {
+    "name": "Ricardo",
+    "voice": "Sulafat",
+    "tone": "Voz masculina suave, simpática, acolhedora, frontal, direta e sem filtros",
+    "appearance": "Homem sereno de cabelos castanhos ondulados, barba suave, olhar frontal direto e acolhedor, túnica de linho cru."
+  }
+}
